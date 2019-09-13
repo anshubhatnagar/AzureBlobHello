@@ -12,6 +12,39 @@ namespace AzureBlob.Hello.Web.Services
     {
         public async Task UploadBlob(string fileName, Stream stream, string connectionString)
         {
+            CloudBlobClient cloudBlobClient = GetBlobClient(connectionString);
+            CloudBlobContainer cloudBlobContainer = await GetBlobContainer(cloudBlobClient);
+
+            // Get a reference to the blob address, then upload the file to the blob.
+            // Use the value of localFileName for the blob name.
+            CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(fileName);
+
+            await cloudBlockBlob.UploadFromStreamAsync(stream);
+        }
+
+        public async Task<List<string>> GetBlobList(string connectionString)
+        {
+            CloudBlobClient cloudBlobClient = GetBlobClient(connectionString);
+            CloudBlobContainer cloudBlobContainer = await GetBlobContainer(cloudBlobClient);
+            BlobContinuationToken blobContinuationToken = null;
+            List<string> imageList = new List<string>();
+
+            do
+            {
+                var results = await cloudBlobContainer.ListBlobsSegmentedAsync(null, blobContinuationToken);
+                // Get the value of the continuation token returned by the listing call.
+                blobContinuationToken = results.ContinuationToken;
+                foreach (IListBlobItem item in results.Results)
+                {
+                    imageList.Add(item.Uri.ToString());
+                }
+            } while (blobContinuationToken != null); // Loop while the continuation token is not null.
+
+            return imageList;
+        }
+
+        private CloudBlobClient GetBlobClient(string connectionString)
+        {
             CloudStorageAccount storageAccount;
 
             if (!CloudStorageAccount.TryParse(connectionString, out storageAccount))
@@ -23,6 +56,11 @@ namespace AzureBlob.Hello.Web.Services
             // Blob storage endpoint for the storage account.
             CloudBlobClient cloudBlobClient = storageAccount.CreateCloudBlobClient();
 
+            return cloudBlobClient;
+        }
+
+        private async Task<CloudBlobContainer> GetBlobContainer(CloudBlobClient cloudBlobClient)
+        {
             // Create a container called 'quickstartblobs' and 
             // append a GUID value to it to make the name unique.
             CloudBlobContainer cloudBlobContainer =
@@ -40,11 +78,7 @@ namespace AzureBlob.Hello.Web.Services
                 await cloudBlobContainer.SetPermissionsAsync(permissions);
             }
 
-            // Get a reference to the blob address, then upload the file to the blob.
-            // Use the value of localFileName for the blob name.
-            CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(fileName);
-
-            await cloudBlockBlob.UploadFromStreamAsync(stream);
+            return cloudBlobContainer;
         }
     }
 }

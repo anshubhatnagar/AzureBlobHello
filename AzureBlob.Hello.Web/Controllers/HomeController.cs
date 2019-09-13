@@ -14,21 +14,24 @@ namespace AzureBlob.Hello.Web.Controllers
     public class HomeController : Controller
     {
         private readonly IConfiguration _config;
+        private readonly string _connectionString;
 
         public HomeController(IConfiguration config)
         {
             _config = config;
+            _connectionString = _config.GetValue<string>("AzureStorage:ConnectionString");
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var blobService = new BlobService();
+            List<string> imageList = await blobService.GetBlobList(_connectionString);
+
+            return View(imageList);
         }
 
         public async Task<IActionResult> UploadFiles(List<IFormFile> files)
         {
-            string connectionString = _config.GetValue<string>("AzureStorage:ConnectionString");
-
             foreach (var file in files)
             {
                 if (file.Length <= 0)
@@ -38,8 +41,8 @@ namespace AzureBlob.Hello.Web.Controllers
 
                 using (var stream = file.OpenReadStream())
                 {
-                    BlobService blobService = new BlobService();
-                    await blobService.UploadBlob(file.FileName, stream, connectionString);
+                    var blobService = new BlobService();
+                    await blobService.UploadBlob(file.FileName, stream, _connectionString);
                 }
             }
 
